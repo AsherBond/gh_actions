@@ -19,13 +19,15 @@ runs:
   steps:
     - name: Install Knative
       id: knative
+      env:
+        INPUTS_VERSION: ${{ inputs.version }}
       shell: bash
       run: |
         # Eliminates the resources blocks in a release yaml
         function resource_blaster() {
           local FILE="${1}"
 
-          curl -L -s "https://github.com/knative/eventing/releases/download/knative-v${{ inputs.version }}/${FILE}" \
+          curl -L -s "https://github.com/knative/eventing/releases/download/knative-v${INPUTS_VERSION}/${FILE}" \
             | yq e 'del(.spec.template.spec.containers[]?.resources)' - \
             `# Filter out empty objects that come out as {} b/c kubectl barfs` \
             | grep -v '^{}$'
@@ -36,7 +38,7 @@ runs:
         resource_blaster in-memory-channel.yaml | kubectl apply -f -
         resource_blaster mt-channel-broker.yaml | kubectl apply -f -
 
-        cat | kubectl apply -f - <<EOF
+        kubectl apply -f - <<EOF
         apiVersion: v1
         kind: ConfigMap
         metadata:
@@ -65,6 +67,6 @@ runs:
 
         # Wait for Knative to be ready (or webhook will reject services)
         for x in $(kubectl get deploy --namespace knative-eventing -oname); do
-          kubectl rollout status --timeout 5m --namespace knative-eventing $x
+          kubectl rollout status --timeout 5m --namespace knative-eventing "$x"
         done
 

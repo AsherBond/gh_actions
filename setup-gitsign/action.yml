@@ -18,21 +18,21 @@ runs:
         fi
         set -e
 
-        mkdir -p $HOME/.gitsign
+        mkdir -p "$HOME/.gitsign"
 
         shaprog() {
-          case ${{ runner.os }} in
+          case "${RUNNER_OS}" in
             Linux)
-              sha256sum $1 | cut -d' ' -f1
+              sha256sum "$1" | cut -d' ' -f1
               ;;
             macOS)
-              shasum -a256 $1 | cut -d' ' -f1
+              shasum -a256 "$1" | cut -d' ' -f1
               ;;
             Windows)
               powershell -command "(Get-FileHash $1 -Algorithm SHA256 | Select-Object -ExpandProperty Hash).ToLower()"
               ;;
             *)
-              log_error "unsupported OS ${{ runner.os }}"
+              log_error "unsupported OS ${RUNNER_OS}"
               exit 1
               ;;
           esac
@@ -49,9 +49,9 @@ runs:
 
         trap "popd >/dev/null" EXIT
 
-        pushd $HOME/.gitsign > /dev/null
+        pushd "$HOME/.gitsign" > /dev/null
 
-        case "${{ runner.os }}-${{ runner.arch }}" in
+        case "${RUNNER_OS}-${RUNNER_ARCH}" in
           Linux-X64)
             gitsign_filename=gitsign_${gitsign_version}_linux_amd64
             gitsign_sha=${gitsign_linux_amd64_sha}
@@ -85,7 +85,7 @@ runs:
             ;;
 
           *)
-            log_error "unsupported architecture ${{ runner.arch }}"
+            log_error "unsupported architecture ${RUNNER_ARCH}"
             exit 1
             ;;
         esac
@@ -93,8 +93,8 @@ runs:
         expected_gitsign_version_digest=${gitsign_sha}
         log_info "Downloading gitsign version 'v${gitsign_version}' from https://github.com/sigstore/gitsign/releases/download/v${gitsign_version}/${gitsign_filename}"
         curl -sL https://github.com/sigstore/gitsign/releases/download/v${gitsign_version}/${gitsign_filename} -o ${gitsign_executable_name}
-        shaDownloaded=$(shaprog ${gitsign_executable_name});
-        if [[ ${shaDownloaded} != ${expected_gitsign_version_digest} ]]; then
+        shaDownloaded=$(shaprog "${gitsign_executable_name}");
+        if [[ ${shaDownloaded} != "${expected_gitsign_version_digest}" ]]; then
           log_error "Unable to validate gitsign version: 'v${gitsign_version}': want ${expected_gitsign_version_digest}, got ${shaDownloaded}"
           exit 1
         fi
@@ -107,12 +107,12 @@ runs:
         git config --global gpg.format x509           # gitsign expects x509 args
 
         # Use workflow name as the username
-        git config --global user.name "${{ github.workflow }}"
+        git config --global user.name "${GITHUB_WORKFLOW}"
         # This email identifies the commit as GitHub Actions - see https://github.com/orgs/community/discussions/26560
         git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
     - if: ${{ runner.os == 'Linux' || runner.os == 'macOS' }}
-      run: echo "$HOME/.gitsign" >> $GITHUB_PATH
+      run: printf '%s\n' "$HOME/.gitsign" >> "$GITHUB_PATH"
       shell: bash
 
     - if: ${{ runner.os == 'Windows' }}

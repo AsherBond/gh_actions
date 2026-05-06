@@ -45,27 +45,31 @@ runs:
   using: "composite"
   steps:
     - name: Collect cluster diagnostics
+      env:
+        INPUTS_CLUSTER_RESOURCES: ${{ inputs.cluster-resources }}
       shell: bash
       run: |
-        for resource in $(echo "${{ inputs.cluster-resources }}" | sed 's/,/ /g'); do
-          for x in $(kubectl get $resource -oname || true); do
+        for resource in $(echo "${INPUTS_CLUSTER_RESOURCES}" | sed 's/,/ /g'); do
+          for x in $(kubectl get "$resource" -oname || true); do
             echo "::group:: describe $resource $x"
-            kubectl describe $x || true
+            kubectl describe "$x" || true
             echo '::endgroup::'
           done
         done
 
     - name: Collect namespace diagnostics
+      env:
+        INPUTS_NAMESPACE_RESOURCES: ${{ inputs.namespace-resources }}
       shell: bash
       run: |
         for ns in $(kubectl get ns -oname | cut -d'/' -f 2); do
-          for resource in $(echo "${{ inputs.namespace-resources }}" | sed 's/,/ /g'); do
-            echo --- $ns $resource ---
-            kubectl get $resource -n${ns}
-            for x in $(kubectl get $resource -n${ns} -oname || true); do
+          for resource in $(echo "${INPUTS_NAMESPACE_RESOURCES}" | sed 's/,/ /g'); do
+            echo --- "$ns" "$resource" ---
+            kubectl get "$resource" -n"${ns}"
+            for x in $(kubectl get "$resource" -n"${ns}" -oname || true); do
               echo "::group:: describe $resource $x"
               # Don't fail if the resource disappears midway.
-              kubectl describe -n${ns} $x || true
+              kubectl describe -n"${ns}" "$x" || true
               echo '::endgroup::'
             done
           done
@@ -75,9 +79,9 @@ runs:
       shell: bash
       run: |
         for ns in $(kubectl get ns -oname | cut -d'/' -f 2); do
-          for pod in $(kubectl get pods -n $ns -o name); do
+          for pod in $(kubectl get pods -n "$ns" -o name); do
             echo "::group:: $ns logs $pod"
-            kubectl logs -n${ns} $pod || true
+            kubectl logs -n"${ns}" "$pod" || true
             echo '::endgroup::'
           done
         done
@@ -87,31 +91,35 @@ runs:
       run: |
         for ns in $(kubectl get ns -oname | cut -d'/' -f 2); do
           echo "::group:: $ns events"
-          kubectl get events --field-selector type!=Normal --sort-by=.metadata.creationTimestamp -o wide -n${ns} || true
+          kubectl get events --field-selector type!=Normal --sort-by=.metadata.creationTimestamp -o wide -n"${ns}" || true
           echo '::endgroup::'
         done
 
     - name: Collect kind specific logs
       if: ${{ inputs.cluster-type == 'kind' }}
+      env:
+        INPUTS_ARTIFACT_NAME: ${{ inputs.artifact-name }}
       shell: bash
       run: |
-        mkdir -p /tmp/${{ inputs.artifact-name }}
-        kind export logs /tmp/${{ inputs.artifact-name }}
+        mkdir -p "/tmp/${INPUTS_ARTIFACT_NAME}"
+        kind export logs "/tmp/${INPUTS_ARTIFACT_NAME}"
 
     # This mimics what kind export logs is doing, which is basically a dump of each nodes /var/log/ + kind metadata
     # ref: https://github.com/kubernetes-sigs/kind/blob/main/pkg/cluster/internal/providers/common/logs.go#L14
     - name: Collect k3d specifc logs
       if: ${{ inputs.cluster-type == 'k3d' }}
+      env:
+        INPUTS_ARTIFACT_NAME: ${{ inputs.artifact-name }}
       shell: bash
       run: |
-        out="/tmp/${{ inputs.artifact-name }}"
+        out="/tmp/${INPUTS_ARTIFACT_NAME}"
         mkdir -p "$out/k3d"
 
         docker ps --format '{{.Names}} {{.ID}}' | grep -i "^k3d-" | while read -r name id; do
-          docker cp $id:/var/log/ $out/k3d/$name
+          docker cp "$id":/var/log/ "$out/k3d/$name"
         done
 
-        k3d version -ojson > $out/k3d/k3d-version.json
+        k3d version -ojson > "$out/k3d/k3d-version.json"
 
     - name: Upload artifacts
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

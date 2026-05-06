@@ -31,21 +31,30 @@ runs:
   using: composite
   steps:
     - name: Download and verify checksum
+      env:
+        INPUTS_URL: ${{ inputs.url }}
+        INPUTS_OUTPUT: ${{ inputs.output }}
+        INPUTS_CHECKSUM: ${{ inputs.checksum }}
+        INPUTS_WGET_FLAGS: ${{ inputs.wget-flags }}
       shell: bash
       run: |
         set -euo pipefail
 
-        URL="${{ inputs.url }}"
-        OUTPUT="${{ inputs.output }}"
-        CHECKSUMS="${{ inputs.checksum }}"
-        WGET_FLAGS="${{ inputs.wget-flags }}"
+        URL="${INPUTS_URL}"
+        OUTPUT="${INPUTS_OUTPUT}"
+        CHECKSUMS="${INPUTS_CHECKSUM}"
+        WGET_FLAGS="${INPUTS_WGET_FLAGS}"
 
         if [ -n "${OUTPUT}" ]; then
           echo "Downloading ${URL} to ${OUTPUT}..."
+          # WGET_FLAGS intentionally word-splits into multiple flags
+          # shellcheck disable=SC2086
           wget ${WGET_FLAGS} -O "${OUTPUT}" "${URL}"
           FILE_PATH="${OUTPUT}"
         else
           echo "Downloading ${URL}..."
+          # WGET_FLAGS intentionally word-splits into multiple flags
+          # shellcheck disable=SC2086
           wget ${WGET_FLAGS} "${URL}"
           FILE_PATH=$(basename "${URL}")
         fi

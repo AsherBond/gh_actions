@@ -78,7 +78,7 @@ runs:
         fname="shellcheck-$VERSION.${platform}.$arch.tar.xz"
 
         url="https://api.github.com/repos/koalaman/shellcheck/releases/tags/$VERSION"
-        curl --fail -s "$url" -u "username:${{ github.token }}" > assets.json ||
+        curl --fail -s "$url" -u "username:${GITHUB_TOKEN}" > assets.json ||
             fail "curl failed for $url"
 
         out=$(jq -r --arg fname "$fname" '
@@ -140,4 +140,6 @@ runs:
         echo "shellscripts=$shellscripts"
         chmod u+x "$shellscripts"
 
+        # INCLUDE_PATHS intentionally word-splits paths; subcommand set via env: block (not visible to shellcheck)
+        # shellcheck disable=SC2086,SC2154
         "$shellscripts" "$subcommand" ${INCLUDE_PATHS}
